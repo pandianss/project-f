@@ -1,0 +1,28 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import { ZodError } from 'zod';
+import { config } from './config.js';
+import { registerRoutes } from './routes.js';
+
+const app = Fastify({ logger: true });
+
+await app.register(cors, { origin: true });
+
+app.setErrorHandler((err, _req, reply) => {
+  if (err instanceof ZodError) {
+    return reply.code(400).send({ error: 'validation_error', issues: err.issues });
+  }
+  const e = err as { statusCode?: number; message?: string };
+  const statusCode = e.statusCode ?? 500;
+  reply.code(statusCode).send({ error: e.message ?? 'internal_error' });
+});
+
+await registerRoutes(app);
+
+app
+  .listen({ port: config.port, host: '0.0.0.0' })
+  .then(() => app.log.info(`FarmOS core API on :${config.port}`))
+  .catch((err) => {
+    app.log.error(err);
+    process.exit(1);
+  });

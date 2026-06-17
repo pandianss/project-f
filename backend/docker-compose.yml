@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: farmos-db
+    environment:
+      POSTGRES_USER: farmos
+      POSTGRES_PASSWORD: farmos
+      POSTGRES_DB: farmos
+    ports:
+      - "5433:5432"
+    volumes:
+      - farmos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U farmos -d farmos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  farmos_pgdata:
