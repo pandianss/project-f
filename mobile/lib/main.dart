@@ -4,6 +4,8 @@ import 'api.dart';
 import 'strings.dart';
 import 'screens.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 void main() => runApp(const FarmosApp());
 
 /// App-wide session + locale, kept deliberately simple (no extra state libs).
@@ -24,7 +26,7 @@ class AppState extends InheritedWidget {
   final String? farmerName;
   final Locale locale;
   final void Function(Locale) setLocale;
-  final void Function(String id, String name) setFarmer;
+  final void Function(String? id, String? name) setFarmer;
 
   static AppState of(BuildContext c) => c.dependOnInheritedWidgetOfExactType<AppState>()!;
 
@@ -44,19 +46,65 @@ class _FarmosAppState extends State<FarmosApp> {
   Locale _locale = const Locale('en');
   String? _farmerId;
   String? _farmerName;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _farmerId = prefs.getString('farmer_id');
+      _farmerName = prefs.getString('farmer_name');
+      final lang = prefs.getString('locale') ?? 'en';
+      _locale = Locale(lang);
+      _loading = false;
+    });
+  }
+
+  Future<void> _saveSession(String? id, String? name) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (id == null || name == null) {
+      await prefs.remove('farmer_id');
+      await prefs.remove('farmer_name');
+    } else {
+      await prefs.setString('farmer_id', id);
+      await prefs.setString('farmer_name', name);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+          ),
+        ),
+      );
+    }
+
     return AppState(
       api: _api,
       farmerId: _farmerId,
       farmerName: _farmerName,
       locale: _locale,
-      setLocale: (l) => setState(() => _locale = l),
-      setFarmer: (id, name) => setState(() {
-        _farmerId = id;
-        _farmerName = name;
-      }),
+      setLocale: (l) async {
+        setState(() => _locale = l);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('locale', l.languageCode);
+      },
+      setFarmer: (id, name) {
+        setState(() {
+          _farmerId = id;
+          _farmerName = name;
+        });
+        _saveSession(id, name);
+      },
       child: MaterialApp(
         title: 'FarmOS',
         debugShowCheckedModeBanner: false,
