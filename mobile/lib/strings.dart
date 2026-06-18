@@ -9,7 +9,7 @@ class S {
   static const supported = [Locale('en'), Locale('hi'), Locale('ta')];
 
   static const _t = <String, Map<String, String>>{
-    'app_title': {'en': 'FarmOS', 'hi': 'फार्मओएस', 'ta': 'பார்ம்ஓஎஸ்'},
+    'app_title': {'en': 'Fasal Mitra AI', 'hi': 'फसल मित्र AI', 'ta': 'பயிர் நண்பன்'},
     'my_farm': {'en': 'My Farm', 'hi': 'मेरा खेत', 'ta': 'என் பண்ணை'},
     'fields': {'en': 'Fields', 'hi': 'खेत', 'ta': 'வயல்கள்'},
     'add_field': {'en': 'Add Field', 'hi': 'खेत जोड़ें', 'ta': 'வயல் சேர்'},

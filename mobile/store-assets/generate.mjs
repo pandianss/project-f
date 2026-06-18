@@ -49,8 +49,8 @@ const feature = `
     <path d="M0 -70 C-62 -30 -62 50 0 86 C62 50 62 -30 0 -70 Z" fill="#ffffff"/>
     <path d="M0 -54 L0 78" stroke="${GREEN}" stroke-width="9" stroke-linecap="round"/>
   </g>
-  <text x="250" y="210" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="800" fill="#ffffff">FarmOS</text>
-  <text x="252" y="270" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#E8F5E9">Your farm's AI assistant</text>
+  <text x="250" y="205" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="800" fill="#ffffff">Fasal Mitra AI</text>
+  <text x="252" y="262" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#E8F5E9">Your farm's AI friend · பயிர் நண்பன்</text>
   <text x="252" y="318" font-family="Segoe UI, Arial, sans-serif" font-size="26" fill="#C8E6C9">Advisory • Crop advice • Risk &amp; Credit • English/Hindi/Tamil</text>
 </svg>`;
 
@@ -64,7 +64,7 @@ function phone({ caption, screen }) {
   <rect x="120" y="200" width="840" height="1560" rx="60" fill="#ffffff"/>
   <rect x="120" y="200" width="840" height="120" rx="60" fill="${GREEN}"/>
   <rect x="120" y="260" width="840" height="60" fill="${GREEN}"/>
-  <text x="170" y="278" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff">FarmOS</text>
+  <text x="170" y="278" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="700" fill="#ffffff">Fasal Mitra AI</text>
   ${screen}
 </svg>`;
 }

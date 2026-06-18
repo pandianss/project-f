@@ -106,7 +106,7 @@ class _FarmosAppState extends State<FarmosApp> {
         _saveSession(id, name);
       },
       child: MaterialApp(
-        title: 'FarmOS',
+        title: 'Fasal Mitra AI',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorSchemeSeed: const Color(0xFF2E7D32),
