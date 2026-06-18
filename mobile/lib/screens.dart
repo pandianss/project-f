@@ -99,7 +99,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${s.t('my_farm')} — ${app.farmerName ?? ''}'),
-        actions: [_LangMenu(onPick: app.setLocale)],
+        actions: [
+          _LangMenu(onPick: app.setLocale),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            tooltip: 'Log Out',
+            onPressed: () => app.setFarmer(null, null),
+          ),
+        ],
       ),
       body: pages[_tab],
       bottomNavigationBar: NavigationBar(
