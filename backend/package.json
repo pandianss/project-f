@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node --import tsx src/server.ts",
+    "start:prod": "tsx src/db/migrate.ts && node --import tsx src/server.ts",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
     "test": "node --import tsx src/db/test.ts",

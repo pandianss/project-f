@@ -1,7 +1,15 @@
 import pg from 'pg';
 import { config } from '../config.js';
 
-export const pool = new pg.Pool({ connectionString: config.databaseUrl });
+// Managed Postgres providers (Render/Railway/Fly/Supabase) require TLS. Enable it
+// in production or when the connection string asks for it; local Docker does not.
+const needsSsl =
+  config.nodeEnv === 'production' || /sslmode=require/.test(config.databaseUrl);
+
+export const pool = new pg.Pool({
+  connectionString: config.databaseUrl,
+  ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+});
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,

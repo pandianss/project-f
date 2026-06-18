@@ -1,13 +1,19 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// FarmOS core API client.
+/// Fasal Mitra AI — core API client.
 ///
-/// Base URL note for Android emulators: the host machine is reachable at
-/// 10.0.2.2 (not localhost). The backend runs on :3001 (see backend/.env.example).
+/// Base URL precedence: explicit constructor arg > --dart-define=API_BASE_URL >
+/// dev default. For production builds pass your public HTTPS API, e.g.:
+///   flutter build appbundle --release --dart-define=API_BASE_URL=https://api.fasalmitra.ai
+/// Android-emulator dev default is 10.0.2.2 (the host machine), backend on :3001.
+const String _kBaseUrlFromEnv =
+    String.fromEnvironment('API_BASE_URL', defaultValue: '');
+
 class FarmosApi {
   FarmosApi({String? baseUrl})
-      : baseUrl = baseUrl ?? 'http://10.0.2.2:3001';
+      : baseUrl = baseUrl ??
+            (_kBaseUrlFromEnv.isNotEmpty ? _kBaseUrlFromEnv : 'http://10.0.2.2:3001');
 
   final String baseUrl;
   final http.Client _client = http.Client();
