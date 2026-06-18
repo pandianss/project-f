@@ -1,0 +1,34 @@
+# Fly.io config for the Fasal Mitra AI backend.
+# Deploy:
+#   cd backend
+#   fly launch --copy-config --no-deploy      # reuse this file, create the app
+#   fly postgres create --name fasalmitra-db  # managed Postgres
+#   fly postgres attach fasalmitra-db         # sets DATABASE_URL secret
+#   fly postgres connect -a fasalmitra-db     # psql> CREATE EXTENSION IF NOT EXISTS postgis;
+#   fly secrets set NODE_ENV=production JWT_SECRET="$(openssl rand -base64 32)"
+#   fly deploy
+app = "fasalmitra-api"
+primary_region = "bom"   # Mumbai (data residency in India)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  JWT_EXPIRY = "30d"
+  OTP_TTL_MINUTES = "5"
+  SELL_UNLOCK_THRESHOLD = "250"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"

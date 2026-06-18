@@ -16,7 +16,16 @@ Health check path: **`/health`** → `{"status":"ok"}`.
 
 ---
 
-## Option A — Render (simple)
+## Option A0 — Render Blueprint (one click, recommended)
+The repo ships a `render.yaml` that provisions **both** the Postgres database and the
+web service and wires `DATABASE_URL` + a generated `JWT_SECRET` automatically.
+1. In Render: **New → Blueprint** → select this GitHub repo → **Apply**.
+2. Wait for the DB + service to come up. (Migrations run on boot.)
+3. Your API: `https://fasalmitra-api.onrender.com` → test `/health`.
+> PostGIS: Render Postgres includes it; migration `001` runs `CREATE EXTENSION postgis`.
+> If the first deploy errors on the extension, open the DB shell and run it once manually.
+
+## Option A — Render (manual)
 1. **Database:** New → PostgreSQL. After it's up, connect and run `CREATE EXTENSION IF NOT EXISTS postgis;`
    (Render Postgres includes PostGIS). Copy the **Internal Database URL**.
 2. **Web Service:** New → Web Service → connect this GitHub repo →

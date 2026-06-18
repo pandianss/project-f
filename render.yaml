@@ -1,0 +1,35 @@
+# Render Blueprint — one-click deploy of the Fasal Mitra AI backend + PostGIS.
+# Usage: push to GitHub, then in Render: New → Blueprint → pick this repo.
+# Render reads this file, provisions the database and web service, and wires env.
+services:
+  - type: web
+    name: fasalmitra-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true        # Render generates a strong secret
+      - key: JWT_EXPIRY
+        value: 30d
+      - key: OTP_TTL_MINUTES
+        value: "5"
+      - key: SELL_UNLOCK_THRESHOLD
+        value: "250"
+      - key: ALLOWED_ORIGINS
+        value: ""                   # set to your web origins if you add a web client
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fasalmitra-db
+          property: connectionString
+
+databases:
+  - name: fasalmitra-db
+    plan: free
+    postgresMajorVersion: "16"
+    # Render Postgres includes PostGIS; migration 001 runs CREATE EXTENSION postgis.
