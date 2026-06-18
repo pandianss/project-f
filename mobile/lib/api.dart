@@ -18,23 +18,55 @@ class FarmosApi {
   final String baseUrl;
   final http.Client _client = http.Client();
 
+  /// Bearer token set after OTP login; attached to every request.
+  String? token;
+
+  Map<String, String> _headers({bool json = false}) => {
+        if (json) 'content-type': 'application/json',
+        if (token != null) 'authorization': 'Bearer $token',
+      };
+
   Uri _u(String path, [Map<String, dynamic>? q]) => Uri.parse('$baseUrl$path').replace(
         queryParameters: q?.map((k, v) => MapEntry(k, '$v')),
       );
 
   Future<dynamic> _get(String path, [Map<String, dynamic>? q]) async {
-    final r = await _client.get(_u(path, q));
+    final r = await _client.get(_u(path, q), headers: _headers());
     return _decode(r);
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
     final r = await _client.post(
       _u(path),
-      headers: {'content-type': 'application/json'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
     return _decode(r);
   }
+
+  Future<dynamic> _delete(String path) async {
+    final r = await _client.delete(_u(path), headers: _headers());
+    return _decode(r);
+  }
+
+  // --- Auth (phone OTP) ---
+  Future<Map<String, dynamic>> requestOtp(String phone) =>
+      _post('/v1/auth/request-otp', {'phone': phone}).then((v) => v as Map<String, dynamic>);
+
+  Future<Map<String, dynamic>> verifyOtp(String phone, String code, String name, String lang) =>
+      _post('/v1/auth/verify-otp', {
+        'phone': phone,
+        'code': code,
+        'full_name': name,
+        'preferred_lang': lang,
+      }).then((v) {
+        final m = v as Map<String, dynamic>;
+        token = m['token'] as String?;
+        return m;
+      });
+
+  Future<Map<String, dynamic>> deleteAccount(String farmerId) =>
+      _delete('/v1/farmers/$farmerId').then((v) => v as Map<String, dynamic>);
 
   dynamic _decode(http.Response r) {
     final body = r.body.isEmpty ? null : jsonDecode(r.body);

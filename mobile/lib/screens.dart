@@ -12,22 +12,46 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
+  final _code = TextEditingController();
   bool _busy = false;
+  bool _otpSent = false;
   String? _err;
+  String? _devCode; // shown only in dev builds (backend returns it)
 
-  Future<void> _submit() async {
+  Future<void> _requestOtp() async {
     final app = AppState.of(context);
     setState(() {
       _busy = true;
       _err = null;
     });
     try {
-      final r = await app.api.createFarmer(
-        _name.text.trim(),
+      final r = await app.api.requestOtp(_phone.text.trim());
+      setState(() {
+        _otpSent = true;
+        _devCode = r['dev_code'] as String?;
+      });
+    } catch (e) {
+      setState(() => _err = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _verify() async {
+    final app = AppState.of(context);
+    setState(() {
+      _busy = true;
+      _err = null;
+    });
+    try {
+      final r = await app.api.verifyOtp(
         _phone.text.trim(),
+        _code.text.trim(),
+        _name.text.trim().isEmpty ? 'Farmer' : _name.text.trim(),
         app.locale.languageCode,
       );
-      app.setFarmer(r['farmer_id'] as String, _name.text.trim());
+      // verifyOtp set api.token; setFarmer persists session + token.
+      app.setFarmer(r['farmer_id'] as String, _name.text.trim().isEmpty ? 'Farmer' : _name.text.trim());
     } catch (e) {
       setState(() => _err = '$e');
     } finally {
@@ -58,9 +82,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _phone,
+              enabled: !_otpSent,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(labelText: s.t('phone'), border: const OutlineInputBorder()),
             ),
+            if (_otpSent) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _code,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'OTP code', border: OutlineInputBorder()),
+              ),
+              if (_devCode != null) ...[
+                const SizedBox(height: 6),
+                Text('Dev code: $_devCode', style: const TextStyle(color: Colors.grey)),
+              ],
+            ],
             if (_err != null) ...[
               const SizedBox(height: 12),
               Text(_err!, style: const TextStyle(color: Colors.red)),
@@ -69,12 +106,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _busy ? null : _submit,
+                onPressed: _busy ? null : (_otpSent ? _verify : _requestOtp),
                 child: _busy
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(s.t('register')),
+                    : Text(_otpSent ? 'Verify & Continue' : 'Send OTP'),
               ),
             ),
+            if (_otpSent)
+              TextButton(
+                onPressed: _busy ? null : () => setState(() => _otpSent = false),
+                child: const Text('Change number'),
+              ),
           ],
         ),
       ),

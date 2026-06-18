@@ -56,6 +56,7 @@ class _FarmosAppState extends State<FarmosApp> {
 
   Future<void> _loadSession() async {
     final prefs = await SharedPreferences.getInstance();
+    _api.token = prefs.getString('token'); // restore auth token for API calls
     setState(() {
       _farmerId = prefs.getString('farmer_id');
       _farmerName = prefs.getString('farmer_name');
@@ -68,11 +69,15 @@ class _FarmosAppState extends State<FarmosApp> {
   Future<void> _saveSession(String? id, String? name) async {
     final prefs = await SharedPreferences.getInstance();
     if (id == null || name == null) {
+      // logout: clear session + token
+      _api.token = null;
       await prefs.remove('farmer_id');
       await prefs.remove('farmer_name');
+      await prefs.remove('token');
     } else {
       await prefs.setString('farmer_id', id);
       await prefs.setString('farmer_name', name);
+      if (_api.token != null) await prefs.setString('token', _api.token!);
     }
   }
 

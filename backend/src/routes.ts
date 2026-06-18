@@ -33,11 +33,66 @@ import {
   feed as forumFeed,
   getThread,
 } from './domain/forum.js';
+import { requestOtp, verifyOtp, deleteAccount, verifyToken, type JwtUser } from './domain/auth.js';
+import type { FastifyRequest } from 'fastify';
 
 // GeoJSON Polygon coordinates: [[ [lng,lat], ... ]]
 const polygon = z.array(z.array(z.tuple([z.number(), z.number()]))).min(1);
 
+// ---- Auth helpers ----
+/** Require a valid Bearer JWT; returns the authenticated farmer. */
+function requireAuth(req: FastifyRequest): JwtUser {
+  const h = req.headers.authorization ?? '';
+  const m = /^Bearer (.+)$/.exec(h);
+  if (!m) throw Object.assign(new Error('Authentication required'), { statusCode: 401 });
+  try {
+    return verifyToken(m[1]);
+  } catch {
+    throw Object.assign(new Error('Invalid or expired token'), { statusCode: 401 });
+  }
+}
+
+/** The authenticated farmer must match the target farmerId. */
+function assertSelf(user: JwtUser, farmerId: string): void {
+  if (user.farmerId !== farmerId)
+    throw Object.assign(new Error('Forbidden: not your account'), { statusCode: 403 });
+}
+
+/** The authenticated farmer must own the field. */
+async function assertFieldOwner(user: JwtUser, fieldId: string): Promise<void> {
+  const r = await query<{ farmer_id: string }>('SELECT farmer_id FROM field WHERE field_id=$1', [
+    fieldId,
+  ]);
+  if (r.rowCount === 0) throw Object.assign(new Error('Field not found'), { statusCode: 404 });
+  if (r.rows[0].farmer_id !== user.farmerId)
+    throw Object.assign(new Error('Forbidden: not your field'), { statusCode: 403 });
+}
+
 export async function registerRoutes(app: FastifyInstance) {
+  // ---- Auth (phone OTP) ----
+  app.post('/v1/auth/request-otp', async (req) => {
+    const { phone } = z.object({ phone: z.string().min(8) }).parse(req.body);
+    return requestOtp(phone);
+  });
+
+  app.post('/v1/auth/verify-otp', async (req) => {
+    const body = z
+      .object({
+        phone: z.string().min(8),
+        code: z.string().min(4),
+        full_name: z.string().optional(),
+        preferred_lang: z.string().optional(),
+      })
+      .parse(req.body);
+    return verifyOtp(body.phone, body.code, body.full_name, body.preferred_lang);
+  });
+
+  // Data deletion (DPDP / Play) — self only.
+  app.delete('/v1/farmers/:id', async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
+    return deleteAccount(id);
+  });
   app.get('/health', async () => ({ status: 'ok' }));
 
   // ---- Farmers / auth (OTP stubbed) ----
@@ -54,11 +109,13 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get('/v1/farmers/:id', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
     return getFarmer(id);
   });
 
   app.post('/v1/farmers/:id/verify-kyc', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
     return verifyKyc(id);
   });
 
@@ -76,16 +133,19 @@ export async function registerRoutes(app: FastifyInstance) {
           .optional(),
       })
       .parse(req.body);
+    assertSelf(requireAuth(req), body.farmerId);
     return reply.code(201).send(await createField(body));
   });
 
   app.get('/v1/fields/:id/passport', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await assertFieldOwner(requireAuth(req), id);
     return getPassport(id);
   });
 
   app.get('/v1/farmers/:id/fields', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
     return listFieldsByFarmer(id);
   });
 
@@ -104,12 +164,14 @@ export async function registerRoutes(app: FastifyInstance) {
         source: z.string().optional(),
       })
       .parse(req.body);
+    await assertFieldOwner(requireAuth(req), id);
     return reply.code(201).send(await addCropSeason({ field_id: id, ...body }));
   });
 
   // ---- Marketplace seller gate (Respect Points) ----
   app.get('/v1/farmers/:id/seller-status', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
     return getSellerStatus(id);
   });
 
@@ -117,6 +179,7 @@ export async function registerRoutes(app: FastifyInstance) {
   // Farmer-facing: compute + view own field scores.
   app.post('/v1/fields/:id/score', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await assertFieldOwner(requireAuth(req), id);
     return scoreField(id);
   });
 
@@ -133,6 +196,7 @@ export async function registerRoutes(app: FastifyInstance) {
         risk_appetite: z.enum(['low', 'medium', 'high']).optional(),
       })
       .parse(req.query);
+    await assertFieldOwner(requireAuth(req), id);
     return recommendCrops({ field_id: id, ...q });
   });
 
@@ -148,11 +212,13 @@ export async function registerRoutes(app: FastifyInstance) {
         wind_kmph: z.number().optional(),
       })
       .parse(req.body ?? {});
+    await assertFieldOwner(requireAuth(req), id);
     return generateAdvisory(id, body);
   });
 
   app.get('/v1/fields/:id/alerts', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await assertFieldOwner(requireAuth(req), id);
     return getActiveAlerts(id);
   });
 
@@ -181,11 +247,13 @@ export async function registerRoutes(app: FastifyInstance) {
         entry_date: z.string().optional(),
       })
       .parse(req.body);
+    await assertFieldOwner(requireAuth(req), id);
     return reply.code(201).send(await addEntry({ field_id: id, ...body }));
   });
 
   app.get('/v1/fields/:id/ledger', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await assertFieldOwner(requireAuth(req), id);
     const q = z
       .object({ season: z.string().optional(), year: z.coerce.number().int().optional() })
       .parse(req.query);
@@ -194,6 +262,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get('/v1/fields/:id/pnl', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await assertFieldOwner(requireAuth(req), id);
     const q = z
       .object({ season: z.enum(['kharif', 'rabi', 'zaid']), year: z.coerce.number().int() })
       .parse(req.query);
@@ -202,6 +271,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get('/v1/farmers/:id/erp-summary', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    assertSelf(requireAuth(req), id);
     const q = z.object({ year: z.coerce.number().int().optional() }).parse(req.query);
     return farmerSummary(id, q.year);
   });
@@ -218,6 +288,7 @@ export async function registerRoutes(app: FastifyInstance) {
         radius_km: z.number().positive().optional(),
       })
       .parse(req.body ?? {});
+    await assertFieldOwner(requireAuth(req), id);
     const { radius_km, ...weather } = body;
     const hasWeather = Object.keys(weather).length > 0;
     return predictDisease(id, hasWeather ? weather : undefined, radius_km ?? 10);

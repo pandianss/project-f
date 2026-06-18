@@ -7,7 +7,10 @@ import { registerRoutes } from './routes.js';
 
 const app = Fastify({ logger: true });
 
-await app.register(cors, { origin: true });
+// Restrict CORS to configured origins in production; allow all only when none set (dev).
+await app.register(cors, {
+  origin: config.allowedOrigins.length > 0 ? config.allowedOrigins : true,
+});
 await app.register(rateLimit, {
   max: 150,
   timeWindow: '1 minute',

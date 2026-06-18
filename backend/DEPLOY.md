@@ -60,9 +60,11 @@ Set `internal_port = 3001` (or read `PORT`) and a health check on `/health`.
 3. Upload the new `.aab` to Play Console.
 
 ## Production hardening checklist (before public launch)
-- [ ] Restrict CORS to known origins (currently `origin: true`).
-- [ ] Real OTP/auth (registration is currently unauthenticated).
-- [ ] Rate limiting on public endpoints (`@fastify/rate-limit` is installed).
+- [x] **Phone-OTP auth + JWT** — `/v1/auth/request-otp` + `/v1/auth/verify-otp`; farmer/field routes require a Bearer token and enforce ownership.
+- [x] **CORS restriction** — set `ALLOWED_ORIGINS` (comma-separated) in production.
+- [x] **Rate limiting** — `@fastify/rate-limit` (150/min).
+- [x] **Data-deletion endpoint** — `DELETE /v1/farmers/:id` (self, cascades all data) for the Play data-safety declaration.
+- [ ] Set a strong `JWT_SECRET` (and never reuse the dev default).
+- [ ] Wire `sendSms()` in `src/domain/auth.ts` to a real SMS gateway (MSG91/Gupshup/Twilio) and stop returning `dev_code`.
 - [ ] Backups on the managed DB; least-privilege DB user.
-- [ ] Data-deletion endpoint to honor the Play data-safety declaration.
 - [ ] Secrets via the platform's secret store (never commit `.env`).
