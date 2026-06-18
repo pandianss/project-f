@@ -1,19 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { query } from './db/pool.js';
 import { createFarmer, verifyKyc, getFarmer } from './domain/farmers.js';
 import { createField, getPassport, listFieldsByFarmer } from './domain/fields.js';
 import { addCropSeason } from './domain/crops.js';
 import { getSellerStatus } from './domain/respect.js';
 import { scoreField } from './domain/scoring.js';
-import { createOrg, grantConsent, revokeConsent, b2bScore, getAudit } from './domain/b2b.js';
-import {
-  createListing,
-  browseListings,
-  placeOrder,
-  payOrder,
-  confirmHandover,
-  createBuyer,
-} from './domain/marketplace.js';
 import { recommendCrops } from './domain/cropreco.js';
 import { generateAdvisory, getActiveAlerts, ackAlert } from './domain/advisory.js';
 import {
@@ -21,7 +13,6 @@ import {
   listEntries,
   seasonPnl,
   farmerSummary,
-  recordMarketplaceIncome,
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
 } from './domain/erp.js';
@@ -129,116 +120,7 @@ export async function registerRoutes(app: FastifyInstance) {
     return scoreField(id);
   });
 
-  // ---- B2B: orgs, consent, consent-scoped scores, audit ----
-  app.post('/v1/b2b/orgs', async (req, reply) => {
-    const body = z
-      .object({ name: z.string().min(1), org_type: z.string().min(1), plan: z.string().optional() })
-      .parse(req.body);
-    return reply.code(201).send(await createOrg(body));
-  });
-
-  app.post('/v1/consent/grant', async (req, reply) => {
-    const body = z
-      .object({
-        field_id: z.string().uuid(),
-        org_id: z.string().uuid(),
-        scope: z.array(z.string()).min(1),
-        valid_days: z.number().int().positive().optional(),
-      })
-      .parse(req.body);
-    return reply.code(201).send(await grantConsent(body));
-  });
-
-  app.post('/v1/consent/revoke', async (req) => {
-    const { grant_id } = z.object({ grant_id: z.string().uuid() }).parse(req.body);
-    return revokeConsent(grant_id);
-  });
-
-  // Consent-scoped B2B score read (org_id via header for this MVP; OAuth client in prod).
-  app.get('/v1/b2b/fields/:id/score', async (req) => {
-    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const { scope } = z
-      .object({ scope: z.enum(['credit', 'farm_risk']).default('credit') })
-      .parse(req.query);
-    const orgId = z.string().uuid().parse((req.headers['x-org-id'] as string) ?? '');
-    return b2bScore(orgId, id, scope);
-  });
-
-  app.get('/v1/audit', async (req) => {
-    const { field_id } = z.object({ field_id: z.string().uuid() }).parse(req.query);
-    return getAudit(field_id);
-  });
-
-  // ---- Marketplace (seller side gated by Respect Points sell_enabled) ----
-  app.post('/v1/market/listings', async (req, reply) => {
-    const body = z
-      .object({
-        field_id: z.string().uuid(),
-        crop: z.string().min(1),
-        variety: z.string().optional(),
-        grade: z.string().optional(),
-        quantity: z.number().positive(),
-        unit: z.string().min(1),
-        price: z.number().positive(),
-        price_basis: z.string().optional(),
-        harvest_date: z.string().optional(),
-        packaging: z.string().optional(),
-      })
-      .parse(req.body);
-    return reply.code(201).send(await createListing(body));
-  });
-
-  app.get('/v1/market/listings', async (req) => {
-    const q = z
-      .object({
-        crop: z.string().optional(),
-        lng: z.coerce.number().optional(),
-        lat: z.coerce.number().optional(),
-        radius_km: z.coerce.number().optional(),
-      })
-      .parse(req.query);
-    return browseListings(q);
-  });
-
-  // ---- Marketplace (buyer side) ----
-  app.post('/v1/market/buyers', async (req, reply) => {
-    const body = z
-      .object({
-        name: z.string().min(1),
-        phone: z.string().min(8),
-        buyer_type: z.string().optional(),
-        preferred_lang: z.string().optional(),
-      })
-      .parse(req.body);
-    return reply.code(201).send(await createBuyer(body));
-  });
-
-  app.post('/v1/market/orders', async (req, reply) => {
-    const body = z
-      .object({
-        listing_id: z.string().uuid(),
-        buyer_id: z.string().uuid(),
-        quantity: z.number().positive(),
-        delivery_mode: z.enum(['pickup', '3pl']).optional(),
-      })
-      .parse(req.body);
-    return reply.code(201).send(await placeOrder(body));
-  });
-
-  app.post('/v1/market/orders/:id/pay', async (req) => {
-    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const { method } = z.object({ method: z.string().optional() }).parse(req.body ?? {});
-    return payOrder(id, method);
-  });
-
-  app.post('/v1/market/orders/:id/confirm', async (req) => {
-    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const { code } = z.object({ code: z.string().min(4) }).parse(req.body);
-    const result = await confirmHandover(id, code);
-    // Realized sale flows into the farmer's ERP ledger as income (idempotent).
-    await recordMarketplaceIncome(id);
-    return result;
-  });
+  // (B2B, Consent, and Marketplace routes deprecated for V1)
 
   // ---- Crop recommendation ----
   app.get('/v1/fields/:id/crop-reco', async (req) => {

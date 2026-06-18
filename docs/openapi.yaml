@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: FarmOS AI India — Core API
+  description: The Operating System for Indian Agriculture. Digital twin of every field, credit scoring, direct-retail marketplace, crop recommendation, disease prediction, and community forum.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Liveness health check
+      responses:
+        '200':
+          description: Server is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /v1/farmers:
+    post:
+      summary: Register/onboard a farmer
+      description: Create a farmer profile. Phone numbers must be unique.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - full_name
+                - phone
+              properties:
+                full_name:
+                  type: string
+                  example: Rajesh Kumar
+                phone:
+                  type: string
+                  example: "9876543210"
+                preferred_lang:
+                  type: string
+                  enum: [en, hi, ta, te, kn]
+                  default: en
+      responses:
+        '201':
+          description: Farmer created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  farmer_id:
+                    type: string
+                    format: uuid
+
+  /v1/farmers/{id}:
+    get:
+      summary: Get farmer profile details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Farmer profile data
+        '404':
+          description: Farmer not found
+
+  /v1/farmers/{id}/verify-kyc:
+    post:
+      summary: Mark farmer KYC status verified
+      description: Demarcates KYC complete and awards +75 Respect Points.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: KYC verified
+
+  /v1/fields:
+    post:
+      summary: Register a field polygon (Farm Passport)
+      description: Adds a field boundary. Automatically calculates area in hectares via PostGIS. Awards +50 Respect Points if passport fields (ownership, water source) are present.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - farmerId
+                - boundary
+              properties:
+                farmerId:
+                  type: string
+                  format: uuid
+                boundary:
+                  type: array
+                  description: GeoJSON polygon coordinates
+                  items:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: number
+                      minItems: 2
+                      maxItems: 2
+                ownership:
+                  type: string
+                  enum: [owned, leased, shared, tenant]
+                surveyNo:
+                  type: string
+                ulpin:
+                  type: string
+                waterSource:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                    depth_m:
+                      type: number
+      responses:
+        '201':
+          description: Field created successfully
+
+  /v1/fields/{id}/passport:
+    get:
+      summary: Retrieve full Farm Passport for a field
+      description: Combines field parameters, history (crop, soil, disease, yield) and latest scores.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Complete digital twin passport
+
+  /v1/farmers/{id}/seller-status:
+    get:
+      summary: Fetch respect points, trust tier, and marketplace eligibility
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Gating status details
+
+  /v1/fields/{id}/score:
+    post:
+      summary: Calculate and view field risk and credit scores
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Fresh scores calculated and returned
+
+  /v1/b2b/fields/{id}/score:
+    get:
+      summary: Consent-gated B2B read of field scores
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [credit, farm_risk]
+            default: credit
+        - name: x-org-id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audited score details
+        '401':
+          description: Organization check failed
+        '403':
+          description: Consent check failed or revoked
+
+  /v1/market/listings:
+    post:
+      summary: Create produce listing on the marketplace
+      description: Locked unless the seller is enabled (KYC complete + corroborated crop seasons + respect points >= 250).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - field_id
+                - crop
+                - quantity
+                - unit
+                - price
+              properties:
+                field_id:
+                  type: string
+                  format: uuid
+                crop:
+                  type: string
+                variety:
+                  type: string
+                grade:
+                  type: string
+                quantity:
+                  type: number
+                unit:
+                  type: string
+                price:
+                  type: number
+      responses:
+        '201':
+          description: Listing published with digital twin provenance
+
+  /v1/fields/{id}/crop-reco:
+    get:
+      summary: Get crop recommendation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: season
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [kharif, rabi, zaid]
+        - name: water_availability
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: risk_appetite
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [low, medium, high]
+      responses:
+        '200':
+          description: Ranked list of crop recommendations
