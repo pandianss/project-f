@@ -24,14 +24,37 @@ export function verifyToken(token: string): JwtUser {
   return jwt.verify(token, config.jwtSecret) as JwtUser;
 }
 
-// Replace with a real SMS gateway (e.g., MSG91/Gupshup/Twilio) in production.
+/** Send the OTP via MSG91 Flow API (DLT template with one variable {{var1}}=code).
+ * Falls back to console logging when MSG91 isn't configured (dev). */
 async function sendSms(phone: string, code: string): Promise<void> {
-  console.log(`[OTP] ${phone} -> ${code}`);
+  if (!config.msg91AuthKey || !config.msg91TemplateId) {
+    console.log(`[OTP] ${phone} -> ${code} (MSG91 not configured)`);
+    return;
+  }
+  try {
+    const res = await fetch('https://control.msg91.com/api/v5/flow/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authkey: config.msg91AuthKey },
+      body: JSON.stringify({
+        template_id: config.msg91TemplateId,
+        sender: config.msg91Sender || undefined,
+        short_url: '0',
+        recipients: [{ mobiles: `91${phone}`, var1: code, OTP: code }],
+      }),
+    });
+    if (!res.ok) console.error(`[OTP] MSG91 send failed ${res.status}: ${await res.text()}`);
+  } catch (e) {
+    console.error('[OTP] MSG91 error', e);
+  }
 }
 
-/** Generate + store a 6-digit OTP for a phone. Returns the code only in non-prod. */
+/** Generate + store a 6-digit OTP for a phone. Returns the code only in non-prod
+ * (or for the configured test phone). */
 export async function requestOtp(phone: string): Promise<{ sent: boolean; dev_code?: string }> {
-  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const isTest = config.testOtpPhone !== '' && phone === config.testOtpPhone;
+  const code = isTest
+    ? config.testOtpCode
+    : String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
   const codeHash = hashCode(phone, code);
   await query(
     `INSERT INTO otp_code (phone, code_hash, expires_at, attempts)
@@ -40,8 +63,9 @@ export async function requestOtp(phone: string): Promise<{ sent: boolean; dev_co
        SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0`,
     [phone, codeHash, String(config.otpTtlMinutes)],
   );
-  await sendSms(phone, code);
-  return isProd ? { sent: true } : { sent: true, dev_code: code };
+  if (!isTest) await sendSms(phone, code);
+  // Return the code in dev, or for the test phone (so QA/Play review can log in).
+  return !isProd || isTest ? { sent: true, dev_code: code } : { sent: true };
 }
 
 /** Verify an OTP; create the farmer on first login; return a JWT. */
