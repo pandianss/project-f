@@ -35,11 +35,23 @@ web service and wires `DATABASE_URL` + a generated `JWT_SECRET` automatically.
    - Health check path: `/health`.
 3. Deploy. Your API is at `https://<service>.onrender.com`.
 
-## Option B — Railway
-1. New Project → **Deploy PostgreSQL**. In its data tab run `CREATE EXTENSION IF NOT EXISTS postgis;`
-2. New Service → **Deploy from GitHub repo**, set root to `backend` (Dockerfile auto-detected).
-3. Variables: `DATABASE_URL` (reference the Postgres plugin var), `NODE_ENV=production`.
-4. Generate a public domain → `https://<svc>.up.railway.app`.
+## Option B — Railway (via GitHub dashboard, no CLI needed) ⭐
+The repo includes `backend/railway.json` (build from Dockerfile + `/health` check).
+1. https://railway.app → **New Project → Deploy from GitHub repo** → pick `pandianss/project-f`.
+2. On the service: **Settings → Root Directory = `backend`** (so it finds the Dockerfile + railway.json).
+3. **New → Database → Add PostgreSQL.** Then open the DB → **Data/Query** and run:
+   `CREATE EXTENSION IF NOT EXISTS postgis;`
+4. On the **API service → Variables**, add:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (reference the Postgres service var)
+   - `NODE_ENV` = `production`
+   - `JWT_SECRET` = a long random string
+   - (optional) `ALLOWED_ORIGINS`, `JWT_EXPIRY`, `OTP_TTL_MINUTES`
+5. **Settings → Networking → Generate Domain** → you get `https://<svc>.up.railway.app`.
+6. It builds + runs migrations on boot. Test: `curl https://<svc>.up.railway.app/health`.
+
+> CLI alternative (needs your login): `npx @railway/cli login` then
+> `cd backend && npx @railway/cli up`. The dashboard path above is simpler and
+> requires no local CLI/auth.
 
 ## Option C — Fly.io
 ```bash
