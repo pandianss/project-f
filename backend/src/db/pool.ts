@@ -1,10 +1,14 @@
 import pg from 'pg';
 import { config } from '../config.js';
 
-// Managed Postgres providers (Render/Railway/Fly/Supabase) require TLS. Enable it
-// in production or when the connection string asks for it; local Docker does not.
+// TLS handling differs per provider:
+//   - Render/Supabase external URLs REQUIRE TLS.
+//   - Railway/Fly INTERNAL URLs do NOT support TLS (private network) — forcing
+//     it crashes the connection.
+// So: enable TLS only when explicitly asked. Set DB_SSL=true (Render), or include
+// sslmode=require in DATABASE_URL. Default off (works on Railway/Fly/local).
 const needsSsl =
-  config.nodeEnv === 'production' || /sslmode=require/.test(config.databaseUrl);
+  process.env.DB_SSL === 'true' || /sslmode=require/.test(config.databaseUrl);
 
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl,

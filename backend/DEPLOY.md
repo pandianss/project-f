@@ -37,17 +37,33 @@ web service and wires `DATABASE_URL` + a generated `JWT_SECRET` automatically.
 
 ## Option B — Railway (via GitHub dashboard, no CLI needed) ⭐
 The repo includes `backend/railway.json` (build from Dockerfile + `/health` check).
+
+> ⚠️ **Two Railway gotchas** (both handled below):
+> 1. Railway's **default Postgres plugin has NO PostGIS** — you must deploy a
+>    **PostGIS image** as the database instead.
+> 2. Railway's internal DB URL does **not** use TLS — so do **not** set `DB_SSL`
+>    (the app defaults to no-SSL, which is correct here).
+
 1. https://railway.app → **New Project → Deploy from GitHub repo** → pick `pandianss/project-f`.
-2. On the service: **Settings → Root Directory = `backend`** (so it finds the Dockerfile + railway.json).
-3. **New → Database → Add PostgreSQL.** Then open the DB → **Data/Query** and run:
-   `CREATE EXTENSION IF NOT EXISTS postgis;`
+2. On the API service: **Settings → Root Directory = `backend`** (finds the Dockerfile + railway.json).
+3. **Add a PostGIS database (not the default Postgres):**
+   - **New → Empty Service** → **Settings → Source → Docker Image** = `postgis/postgis:16-3.4`.
+   - Add **Variables** on that DB service: `POSTGRES_USER=farmos`, `POSTGRES_PASSWORD=<pick one>`, `POSTGRES_DB=farmos`.
+   - **Add a Volume** mounted at `/var/lib/postgresql/data` (so data persists).
+   - (PostGIS is preinstalled in this image; migration `001` runs `CREATE EXTENSION postgis` automatically.)
 4. On the **API service → Variables**, add:
-   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (reference the Postgres service var)
+   - `DATABASE_URL` = `postgresql://farmos:<password>@${{<db-service-name>.RAILWAY_PRIVATE_DOMAIN}}:5432/farmos`
+     (replace `<db-service-name>` with the PostGIS service's name; use its private domain).
    - `NODE_ENV` = `production`
    - `JWT_SECRET` = a long random string
+   - Do **not** set `DB_SSL` (leave unset → no TLS, correct for Railway internal).
    - (optional) `ALLOWED_ORIGINS`, `JWT_EXPIRY`, `OTP_TTL_MINUTES`
-5. **Settings → Networking → Generate Domain** → you get `https://<svc>.up.railway.app`.
+5. **API service → Settings → Networking → Generate Domain** (target port 3001) → `https://<svc>.up.railway.app`.
 6. It builds + runs migrations on boot. Test: `curl https://<svc>.up.railway.app/health`.
+
+> Simpler alternative: **Render's Blueprint (Option A0)** provisions Postgres
+> *with PostGIS* automatically — no manual DB image needed. If Railway's PostGIS
+> setup is fiddly, Render is the faster path for this PostGIS app.
 
 > CLI alternative (needs your login): `npx @railway/cli login` then
 > `cd backend && npx @railway/cli up`. The dashboard path above is simpler and

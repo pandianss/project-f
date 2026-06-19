@@ -13,6 +13,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DB_SSL
+        value: "true"          # Render Postgres requires TLS
       - key: JWT_SECRET
         generateValue: true        # Render generates a strong secret
       - key: JWT_EXPIRY
