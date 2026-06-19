@@ -65,6 +65,18 @@ class FarmosApi {
         return m;
       });
 
+  /// Exchange a Firebase ID token (phone sign-in) for a Kadir JWT.
+  Future<Map<String, dynamic>> loginWithFirebase(String idToken, String name, String lang) =>
+      _post('/v1/auth/firebase', {
+        'id_token': idToken,
+        'full_name': name,
+        'preferred_lang': lang,
+      }).then((v) {
+        final m = v as Map<String, dynamic>;
+        token = m['token'] as String?;
+        return m;
+      });
+
   Future<Map<String, dynamic>> deleteAccount(String farmerId) =>
       _delete('/v1/farmers/$farmerId').then((v) => v as Map<String, dynamic>);
 

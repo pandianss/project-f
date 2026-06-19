@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'strings.dart';
 import 'main.dart';
 
@@ -16,7 +17,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _busy = false;
   bool _otpSent = false;
   String? _err;
-  String? _devCode; // shown only in dev builds (backend returns it)
+  String? _devCode; // shown only in dev/test (backend returns it)
+  String? _verificationId; // Firebase phone verification id
+
+  String get _name_ => _name.text.trim().isEmpty ? 'Farmer' : _name.text.trim();
 
   Future<void> _requestOtp() async {
     final app = AppState.of(context);
@@ -25,11 +29,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _err = null;
     });
     try {
-      final r = await app.api.requestOtp(_phone.text.trim());
-      setState(() {
-        _otpSent = true;
-        _devCode = r['dev_code'] as String?;
-      });
+      if (firebaseReady) {
+        // Firebase sends the SMS OTP (no DLT/business needed).
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: '+91${_phone.text.trim()}',
+          verificationCompleted: (_) {}, // auto-retrieval handled on verify
+          verificationFailed: (e) {
+            if (mounted) setState(() => _err = e.message ?? 'Verification failed');
+          },
+          codeSent: (id, _) {
+            if (mounted) {
+              setState(() {
+                _verificationId = id;
+                _otpSent = true;
+              });
+            }
+          },
+          codeAutoRetrievalTimeout: (id) => _verificationId = id,
+        );
+      } else {
+        // Fallback: backend OTP (incl. test bypass).
+        final r = await app.api.requestOtp(_phone.text.trim());
+        setState(() {
+          _otpSent = true;
+          _devCode = r['dev_code'] as String?;
+        });
+      }
     } catch (e) {
       setState(() => _err = '$e');
     } finally {
@@ -44,14 +69,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _err = null;
     });
     try {
-      final r = await app.api.verifyOtp(
-        _phone.text.trim(),
-        _code.text.trim(),
-        _name.text.trim().isEmpty ? 'Farmer' : _name.text.trim(),
-        app.locale.languageCode,
-      );
-      // verifyOtp set api.token; setFarmer persists session + token.
-      app.setFarmer(r['farmer_id'] as String, _name.text.trim().isEmpty ? 'Farmer' : _name.text.trim());
+      Map<String, dynamic> r;
+      if (firebaseReady) {
+        final cred = PhoneAuthProvider.credential(
+          verificationId: _verificationId!,
+          smsCode: _code.text.trim(),
+        );
+        final userCred = await FirebaseAuth.instance.signInWithCredential(cred);
+        final idToken = await userCred.user!.getIdToken();
+        r = await app.api.loginWithFirebase(idToken!, _name_, app.locale.languageCode);
+      } else {
+        r = await app.api.verifyOtp(
+          _phone.text.trim(),
+          _code.text.trim(),
+          _name_,
+          app.locale.languageCode,
+        );
+      }
+      // api.token is set by the call above; setFarmer persists session + token.
+      app.setFarmer(r['farmer_id'] as String, _name_);
     } catch (e) {
       setState(() => _err = '$e');
     } finally {

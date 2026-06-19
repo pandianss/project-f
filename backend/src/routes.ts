@@ -33,7 +33,14 @@ import {
   feed as forumFeed,
   getThread,
 } from './domain/forum.js';
-import { requestOtp, verifyOtp, deleteAccount, verifyToken, type JwtUser } from './domain/auth.js';
+import {
+  requestOtp,
+  verifyOtp,
+  deleteAccount,
+  verifyToken,
+  loginWithFirebase,
+  type JwtUser,
+} from './domain/auth.js';
 import type { FastifyRequest } from 'fastify';
 
 // GeoJSON Polygon coordinates: [[ [lng,lat], ... ]]
@@ -85,6 +92,18 @@ export async function registerRoutes(app: FastifyInstance) {
       })
       .parse(req.body);
     return verifyOtp(body.phone, body.code, body.full_name, body.preferred_lang);
+  });
+
+  // Firebase Phone Auth: exchange a Firebase ID token for a Kadir JWT.
+  app.post('/v1/auth/firebase', async (req) => {
+    const body = z
+      .object({
+        id_token: z.string().min(20),
+        full_name: z.string().optional(),
+        preferred_lang: z.string().optional(),
+      })
+      .parse(req.body);
+    return loginWithFirebase(body.id_token, body.full_name, body.preferred_lang);
   });
 
   // Data deletion (DPDP / Play) — self only.

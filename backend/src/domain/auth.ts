@@ -3,6 +3,8 @@
 // SMS provider. Production: wire sendSms() to a real gateway and stop returning it.
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { initializeApp, cert, type App } from 'firebase-admin/app';
+import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import { withTx, query } from '../db/pool.js';
 import { config, isProd } from '../config.js';
 import { recomputeSellerStatus } from './respect.js';
@@ -114,6 +116,64 @@ export async function verifyOtp(
     }
     return { token: signToken({ farmerId, phone }), farmer_id: farmerId, is_new: isNew };
   });
+}
+
+// ---- Firebase Phone Auth (no DLT/business needed) ----
+let fbApp: App | null = null;
+function firebase(): App {
+  if (fbApp) return fbApp;
+  const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!sa)
+    throw Object.assign(new Error('Firebase not configured'), { statusCode: 503 });
+  fbApp = initializeApp({ credential: cert(JSON.parse(sa)) });
+  return fbApp;
+}
+
+/** India phone normalize: keep last 10 digits (so +919629951301 -> 9629951301). */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+/** Find or create a farmer by phone; returns the farmer id + whether new. */
+async function findOrCreateFarmer(
+  phone: string,
+  fullName?: string,
+  lang?: string,
+): Promise<{ farmerId: string; isNew: boolean }> {
+  return withTx(async (c) => {
+    const existing = await c.query<{ farmer_id: string }>(
+      'SELECT farmer_id FROM farmer WHERE phone=$1',
+      [phone],
+    );
+    if (existing.rowCount && existing.rowCount > 0)
+      return { farmerId: existing.rows[0].farmer_id, isNew: false };
+    const ins = await c.query<{ farmer_id: string }>(
+      'INSERT INTO farmer (full_name, phone, preferred_lang) VALUES ($1,$2,$3) RETURNING farmer_id',
+      [fullName?.trim() || 'Farmer', phone, lang ?? 'en'],
+    );
+    await recomputeSellerStatus(c, ins.rows[0].farmer_id);
+    return { farmerId: ins.rows[0].farmer_id, isNew: true };
+  });
+}
+
+/** Verify a Firebase ID token (phone sign-in) and issue a Kadir JWT. */
+export async function loginWithFirebase(
+  idToken: string,
+  fullName?: string,
+  lang?: string,
+): Promise<{ token: string; farmer_id: string; is_new: boolean }> {
+  let decoded: DecodedIdToken;
+  try {
+    decoded = await getAuth(firebase()).verifyIdToken(idToken);
+  } catch {
+    throw Object.assign(new Error('Invalid Firebase token'), { statusCode: 401 });
+  }
+  if (!decoded.phone_number)
+    throw Object.assign(new Error('Token has no phone number'), { statusCode: 400 });
+  const phone = normalizePhone(decoded.phone_number);
+  const { farmerId, isNew } = await findOrCreateFarmer(phone, fullName, lang);
+  return { token: signToken({ farmerId, phone }), farmer_id: farmerId, is_new: isNew };
 }
 
 /** Delete a farmer and all their data (DPDP / Play data-deletion).

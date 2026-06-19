@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'api.dart';
 import 'strings.dart';
 import 'screens.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const FarmosApp());
+/// Set once Firebase initializes (needs google-services.json). When false, the
+/// login screen falls back to the backend OTP flow (incl. the test bypass).
+bool firebaseReady = false;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    firebaseReady = true;
+  } catch (_) {
+    firebaseReady = false; // not configured yet — OTP fallback stays active
+  }
+  runApp(const FarmosApp());
+}
 
 /// App-wide session + locale, kept deliberately simple (no extra state libs).
 class AppState extends InheritedWidget {
