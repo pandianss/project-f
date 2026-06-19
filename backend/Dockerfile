@@ -1,4 +1,4 @@
-# Fasal Mitra AI — core API
+# Kadir AI — core API
 # Runs TypeScript directly via tsx (no separate build step).
 FROM node:22-slim
 

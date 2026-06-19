@@ -1,4 +1,4 @@
-# Deploying the Fasal Mitra AI backend (public HTTPS)
+# Deploying the Kadir AI backend (public HTTPS)
 
 The mobile app needs the API on a **public HTTPS URL** before it works for real
 users / Play reviewers. This guide uses the committed `Dockerfile`. Any host that
@@ -21,7 +21,7 @@ The repo ships a `render.yaml` that provisions **both** the Postgres database an
 web service and wires `DATABASE_URL` + a generated `JWT_SECRET` automatically.
 1. In Render: **New → Blueprint** → select this GitHub repo → **Apply**.
 2. Wait for the DB + service to come up. (Migrations run on boot.)
-3. Your API: `https://fasalmitra-api.onrender.com` → test `/health`.
+3. Your API: `https://kadir-api.onrender.com` → test `/health`.
 > PostGIS: Render Postgres includes it; migration `001` runs `CREATE EXTENSION postgis`.
 > If the first deploy errors on the extension, open the DB shell and run it once manually.
 

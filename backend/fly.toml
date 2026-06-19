@@ -1,13 +1,13 @@
-# Fly.io config for the Fasal Mitra AI backend.
+# Fly.io config for the Kadir AI backend.
 # Deploy:
 #   cd backend
-#   fly launch --copy-config --no-deploy      # reuse this file, create the app
-#   fly postgres create --name fasalmitra-db  # managed Postgres
-#   fly postgres attach fasalmitra-db         # sets DATABASE_URL secret
-#   fly postgres connect -a fasalmitra-db     # psql> CREATE EXTENSION IF NOT EXISTS postgis;
+#   fly launch --copy-config --no-deploy   # reuse this file, create the app
+#   fly postgres create --name kadir-db    # managed Postgres
+#   fly postgres attach kadir-db           # sets DATABASE_URL secret
+#   fly postgres connect -a kadir-db       # psql> CREATE EXTENSION IF NOT EXISTS postgis;
 #   fly secrets set NODE_ENV=production JWT_SECRET="$(openssl rand -base64 32)"
 #   fly deploy
-app = "fasalmitra-api"
+app = "kadir-api"
 primary_region = "bom"   # Mumbai (data residency in India)
 
 [build]

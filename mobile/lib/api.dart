@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// Fasal Mitra AI — core API client.
+/// Kadir AI — core API client.
 ///
 /// Base URL precedence: explicit constructor arg > --dart-define=API_BASE_URL >
 /// dev default. For production builds pass your public HTTPS API, e.g.:
-///   flutter build appbundle --release --dart-define=API_BASE_URL=https://api.fasalmitra.ai
+///   flutter build appbundle --release --dart-define=API_BASE_URL=https://kadir-api.up.railway.app
 /// Android-emulator dev default is 10.0.2.2 (the host machine), backend on :3001.
 const String _kBaseUrlFromEnv =
     String.fromEnvironment('API_BASE_URL', defaultValue: '');
